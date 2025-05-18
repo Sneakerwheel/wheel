@@ -110,9 +110,9 @@ const Content = () => {
     setShowWinnerModal(false)
   }
 
-  // We no longer need to remove commas from names
+  // Function to remove commas from names for display
   function removeCommaFromString(str: string) {
-    return str; // Return the string as is
+    return str.replace(/,/g, ''); // Remove all commas for display
   }
 
   return (
@@ -250,7 +250,7 @@ const Content = () => {
         <p className='mt-2 text-base'>{wheelInfo.description}</p>
       </div>
       <div className='leftContainer relative col-span-3 flex flex-col items-center justify-center'>
-     
+
 
         <WheelComponent
           winningSegment={riggedName}
