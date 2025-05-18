@@ -15,7 +15,7 @@ const Header = styled.h1`
   font-size: 2em;
   text-align: center;
   animation: fade-in-out 2s ease infinite;
-
+sign out
   @keyframes fade-in-out {
     0% {
       opacity: 0;

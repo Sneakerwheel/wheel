@@ -174,9 +174,10 @@ const Entries = ({ setRiggedName }) => {
   const handleCopyToClipboard = () => {
     const namesArray = names.split('\n')
     const filteredNames = namesArray.filter(name => name !== '')
-    // Keep commas in the clipboard text - they're allowed in the textarea
-    navigator.clipboard.writeText(filteredNames.join('\n'))
-    setFeedback({ show: true, message: 'Copied to clipboard' })
+    // Keep commas in the clipboard text but also provide the display version (without commas)
+    const displayNames = filteredNames.map(name => name.replace(/,/g, ''))
+    navigator.clipboard.writeText(displayNames.join('\n'))
+    setFeedback({ show: true, message: 'Copied to clipboard (without commas)' })
   }
 
   const toggleSearch = () => {
@@ -217,7 +218,10 @@ const Entries = ({ setRiggedName }) => {
     const namesArray = names.split('\n')
     const filtered = namesArray.filter(name => {
       // Search in the entire name including any comma parts
-      return name.toLowerCase().includes(searchTerm.toLowerCase())
+      // But also allow searching for the name without commas
+      const nameWithoutCommas = name.replace(/,/g, '')
+      return name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+             nameWithoutCommas.toLowerCase().includes(searchTerm.toLowerCase())
     })
     return filtered.join('\n')
   }, [names, searchTerm])
@@ -370,7 +374,7 @@ const Entries = ({ setRiggedName }) => {
           disabled={loading}
           ref={inputRef}
           placeholder='Enter names, each on a new line'
-          value={searchTerm ? filteredNames : removeCommaFromString(names)}
+          value={searchTerm ? filteredNames.replace(/,/g, '') : removeCommaFromString(names).replace(/,/g, '')}
           onChange={e => {
             if (searchTerm) {
               setSearchTerm('')
@@ -379,25 +383,54 @@ const Entries = ({ setRiggedName }) => {
             // Get the current value and cursor position
             const { value, selectionStart } = e.target
 
+            // Since we're hiding commas in display, we need to reinsert them in the actual data
+            // First, split the input into lines
+            const inputLines = value.split('\n')
+            const currentLines = (searchTerm ? filteredNames : names).split('\n')
+
+            // For each line, check if the original had a comma and preserve it
+            const processedLines = inputLines.map((line, index) => {
+              // If we have a corresponding line in the current data
+              if (index < currentLines.length) {
+                const currentLine = currentLines[index]
+                // Check if the current line has a comma
+                if (currentLine.includes(',')) {
+                  // Find position of the comma in the original line
+                  const commaIndex = currentLine.indexOf(',')
+                  // If the edited line is shorter than the comma position, don't add comma
+                  if (line.length < commaIndex) {
+                    return line
+                  }
+                  // Insert the comma at the same position
+                  return line.substring(0, commaIndex) + ',' + line.substring(commaIndex)
+                }
+              }
+              return line
+            }).join('\n')
+
             // Process the value to ensure only one comma per line
-            const processedValue = removeCommaFromString(value)
+            const processedValue = removeCommaFromString(processedLines)
 
-            // Only update if the processed value is different from the input value
-            if (processedValue !== value) {
-              // Calculate how many characters were removed at or before the cursor position
-              const beforeCursor = value.substring(0, selectionStart)
-              const processedBeforeCursor = removeCommaFromString(beforeCursor)
-              const cursorOffset = beforeCursor.length - processedBeforeCursor.length
+            // Calculate cursor position adjustment
+            // Since we're hiding commas, the cursor position in the display is different from the data
+            // We need to adjust it based on how many commas were before the cursor
+            const beforeCursor = value.substring(0, selectionStart)
+            const linesBeforeCursor = beforeCursor.split('\n')
+            const currentLinesBeforeCursor = (searchTerm ? filteredNames : names).split('\n').slice(0, linesBeforeCursor.length - 1)
 
-              // Set the processed value and adjust cursor position
-              e.target.value = processedValue
+            // Count commas in current line before cursor
+            const currentLineIndex = linesBeforeCursor.length - 1
+            const cursorPosInLine = linesBeforeCursor[linesBeforeCursor.length - 1].length
+            let commasBeforeCursor = 0
 
-              // Adjust cursor position to account for removed commas
-              const newCursorPosition = Math.max(0, selectionStart - cursorOffset)
-              setTimeout(() => {
-                e.target.selectionStart = newCursorPosition
-                e.target.selectionEnd = newCursorPosition
-              }, 0)
+            if (currentLineIndex < currentLines.length) {
+              const currentLine = currentLines[currentLineIndex]
+              if (currentLine.includes(',')) {
+                const commaIndex = currentLine.indexOf(',')
+                if (commaIndex < cursorPosInLine) {
+                  commasBeforeCursor = 1 // We only have one comma per line
+                }
+              }
             }
 
             const namesArray = processedValue.split('\n')
